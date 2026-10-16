@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Finance Tracker</string>
+    <string name="currency_symbol">₹</string>
+</resources>
