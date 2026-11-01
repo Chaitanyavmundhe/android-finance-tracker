@@ -11,12 +11,15 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
@@ -32,6 +35,7 @@ class FirebaseSyncManager(
 ) {
     private val auth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
     private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
+    private var snapshotListener: ListenerRegistration? = null
 
     private val _syncStatus = MutableStateFlow<SyncStatus>(SyncStatus.Idle)
     val syncStatus: StateFlow<SyncStatus> = _syncStatus.asStateFlow()
@@ -54,7 +58,53 @@ class FirebaseSyncManager(
             _currentUser.value = null
         } else {
             _currentUser.value = current
+            if (current != null) {
+                startRealtimeSync(current.uid)
+            }
         }
+    }
+
+    private fun startRealtimeSync(userId: String) {
+        snapshotListener?.remove()
+        try {
+            snapshotListener = firestore.collection("users")
+                .document(userId)
+                .collection("transactions")
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null || snapshot == null) return@addSnapshotListener
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            val localTransactions = repository.allTransactions.first()
+                            for (doc in snapshot.documents) {
+                                val amount = doc.getDouble("amount") ?: continue
+                                val typeStr = doc.getString("type") ?: "EXPENSE"
+                                val type = try {
+                                    TransactionType.valueOf(typeStr)
+                                } catch (_: Exception) {
+                                    TransactionType.EXPENSE
+                                }
+                                val note = doc.getString("note") ?: ""
+                                val timestamp = doc.getLong("timestamp") ?: continue
+
+                                val existsLocally = localTransactions.any {
+                                    it.timestamp == timestamp && it.amount == amount && it.type == type
+                                }
+                                if (!existsLocally) {
+                                    repository.insertTransaction(
+                                        Transaction(
+                                            id = 0,
+                                            amount = amount,
+                                            type = type,
+                                            note = note,
+                                            timestamp = timestamp
+                                        )
+                                    )
+                                }
+                            }
+                        } catch (_: Exception) {}
+                    }
+                }
+        } catch (_: Exception) {}
     }
 
     fun getGoogleSignInIntent(context: Context): Intent {
@@ -73,6 +123,7 @@ class FirebaseSyncManager(
             val user = authResult.user ?: return@withContext Result.failure(Exception("No user found after Google sign-in"))
             _currentUser.value = user
             syncAll()
+            startRealtimeSync(user.uid)
             Result.success(user)
         } catch (e: Exception) {
             Result.failure(e)
@@ -81,6 +132,8 @@ class FirebaseSyncManager(
 
     fun signOut(context: Context) {
         try {
+            snapshotListener?.remove()
+            snapshotListener = null
             val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
             GoogleSignIn.getClient(context, gso).signOut()
             auth.signOut()

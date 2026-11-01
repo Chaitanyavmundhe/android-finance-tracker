@@ -147,7 +147,7 @@ fun SummaryCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (isCloudSynced) "Cloud Synced" else "Local Storage",
+                        text = if (isCloudSynced) "Auto Synced" else "Local Storage",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         color = StitchOnSurfaceVariant

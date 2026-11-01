@@ -194,13 +194,13 @@ fun DashboardScreen(
                                 ) {
                                     Column {
                                         Text(
-                                            text = "Google Account",
+                                            text = currentUser?.displayName ?: "Google Account",
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 14.sp,
                                             color = StitchOnSurface
                                         )
                                         Text(
-                                            text = "Connected & Backed Up",
+                                            text = if (currentUser?.email != null) "${currentUser?.email} • Auto-Synced" else "Connected • Auto-Synced",
                                             fontSize = 12.sp,
                                             color = StitchIncome
                                         )
@@ -311,92 +311,7 @@ fun DashboardScreen(
                         }
                     }
 
-                    // Cloud Sync Card (Firebase Firestore) - Only displayed for signed-in Google users
-                    if (isGoogleUser) {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = StitchContainerLow),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(14.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.CloudSync,
-                                            contentDescription = null,
-                                            tint = StitchIncome,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                        Text(
-                                            text = "Cloud Sync (Firebase)",
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize = 14.sp,
-                                            color = StitchOnSurface
-                                        )
-                                    }
 
-                                    when (syncStatus) {
-                                        is SyncStatus.Syncing -> {
-                                            androidx.compose.material3.CircularProgressIndicator(
-                                                modifier = Modifier.size(16.dp),
-                                                strokeWidth = 2.dp,
-                                                color = StitchIncome
-                                            )
-                                        }
-                                        is SyncStatus.Synced -> {
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(50.dp))
-                                                    .background(StitchIncomeContainer)
-                                                    .padding(horizontal = 8.dp, vertical = 2.dp)
-                                            ) {
-                                                Text("Active", fontSize = 11.sp, color = StitchIncome, fontWeight = FontWeight.Bold)
-                                            }
-                                        }
-                                        is SyncStatus.Error -> {
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(50.dp))
-                                                    .background(StitchSpentContainer)
-                                                    .padding(horizontal = 8.dp, vertical = 2.dp)
-                                            ) {
-                                                Text("Offline", fontSize = 11.sp, color = StitchSpent, fontWeight = FontWeight.Bold)
-                                            }
-                                        }
-                                        SyncStatus.Idle -> {}
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                val statusDescription = when (val s = syncStatus) {
-                                    is SyncStatus.Syncing -> "Syncing transactions with Firestore..."
-                                    is SyncStatus.Synced -> "Synced (${s.count} transactions backed up)"
-                                    is SyncStatus.Error -> "Offline / Local mode (${s.message})"
-                                    SyncStatus.Idle -> "Transactions backed up to Google Cloud automatically."
-                                }
-                                Text(
-                                    text = statusDescription,
-                                    fontSize = 12.sp,
-                                    color = StitchOnSurfaceVariant,
-                                    lineHeight = 16.sp
-                                )
-                                Spacer(modifier = Modifier.height(10.dp))
-                                androidx.compose.material3.OutlinedButton(
-                                    onClick = { viewModel.triggerSync() },
-                                    shape = RoundedCornerShape(50.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Text("Sync Now", fontSize = 13.sp, color = StitchOnSurface)
-                                }
-                            }
-                        }
-                    }
                 }
             },
             confirmButton = {
