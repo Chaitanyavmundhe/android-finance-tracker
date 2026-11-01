@@ -9,5 +9,6 @@ enum class TransactionType(val displayName: String) {
 enum class TimeFilter(val label: String) {
     WEEK("This Week"),
     MONTH("This Month"),
-    YEAR("This Year")
+    YEAR("This Year"),
+    ALL("All Time")
 }

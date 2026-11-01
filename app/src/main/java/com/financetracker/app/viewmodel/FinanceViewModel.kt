@@ -27,7 +27,11 @@ data class FinanceSummary(
     val totalInvestment: Double = 0.0,
     val totalExpense: Double = 0.0,
     val idleCash: Double = 0.0
-)
+) {
+    // Budget = Received (Income) - Spent (Expense) - Invested (Investment)
+    val budget: Double
+        get() = totalIncome - totalExpense - totalInvestment
+}
 
 enum class BottomNavTab {
     DASHBOARD,
@@ -215,6 +219,9 @@ class FinanceViewModel(
             }
             TimeFilter.YEAR -> {
                 calendar.set(Calendar.DAY_OF_YEAR, 1)
+            }
+            TimeFilter.ALL -> {
+                return 0L
             }
         }
         return calendar.timeInMillis

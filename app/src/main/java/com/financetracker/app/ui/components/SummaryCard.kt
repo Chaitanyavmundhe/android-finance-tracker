@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Payments
@@ -72,6 +73,13 @@ fun SummaryCard(
     val investFormatted = "₹" + String.format(Locale.US, "%,.0f", summary.totalInvestment)
     val expenseFormatted = "₹" + String.format(Locale.US, "%,.0f", summary.totalExpense)
     val incomeFormatted = "₹" + String.format(Locale.US, "%,.0f", summary.totalIncome)
+
+    val budget = summary.budget
+    val budgetFormatted = if (budget < 0) {
+        "-₹" + String.format(Locale.US, "%,.0f", Math.abs(budget))
+    } else {
+        "₹" + String.format(Locale.US, "%,.0f", budget)
+    }
 
     val todayDateFormatted = SimpleDateFormat("EEEE, dd MMM", Locale.getDefault()).format(Date())
 
@@ -147,33 +155,22 @@ fun SummaryCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // 3-Metric Row (Exact Stitch Grid: Invested, Spent, Received)
+            // 4-Metric 2x2 Grid (Budget, Received, Spent, Invested)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Invested Metric
+                // Budget Metric (Received - Spent - Invested)
                 MetricBox(
                     modifier = Modifier.weight(1f),
-                    title = "Invested",
-                    amount = investFormatted,
-                    badgeText = "$investPercent%",
-                    badgeBg = StitchInvestedContainer,
-                    badgeTextCol = StitchOnInvestedContainer,
-                    icon = Icons.Default.ArrowUpward
-                )
-
-                // Spent Metric
-                MetricBox(
-                    modifier = Modifier.weight(1f),
-                    title = "Spent",
-                    amount = expenseFormatted,
-                    badgeText = "$expensePercent%",
-                    badgeBg = StitchErrorContainer,
-                    badgeTextCol = StitchOnSpentContainer,
-                    icon = Icons.Default.ArrowDownward
+                    title = "Budget",
+                    amount = budgetFormatted,
+                    badgeText = if (budget >= 0) "Net" else "Deficit",
+                    badgeBg = if (budget >= 0) StitchIncomeContainer else StitchErrorContainer,
+                    badgeTextCol = if (budget >= 0) StitchIncome else StitchSpent,
+                    icon = Icons.Default.AccountBalanceWallet
                 )
 
                 // Received Metric
@@ -185,6 +182,55 @@ fun SummaryCard(
                     badgeBg = StitchIncomeContainer,
                     badgeTextCol = StitchIncome,
                     icon = Icons.Default.Payments
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Spent Metric
+                MetricBox(
+                    modifier = Modifier.weight(1f),
+                    title = "Spent",
+                    amount = expenseFormatted,
+                    badgeText = "$expensePercent%",
+                    badgeBg = StitchErrorContainer,
+                    badgeTextCol = StitchOnSpentContainer,
+                    icon = Icons.Default.ArrowDownward
+                )
+
+                // Invested Metric
+                MetricBox(
+                    modifier = Modifier.weight(1f),
+                    title = "Invested",
+                    amount = investFormatted,
+                    badgeText = "$investPercent%",
+                    badgeBg = StitchInvestedContainer,
+                    badgeTextCol = StitchOnInvestedContainer,
+                    icon = Icons.Default.ArrowUpward
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Formula indicator: budget = recieved - spent - invested
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(StitchContainerLow)
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Budget = Received − Spent − Invested",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = StitchOnSurfaceVariant
                 )
             }
 
