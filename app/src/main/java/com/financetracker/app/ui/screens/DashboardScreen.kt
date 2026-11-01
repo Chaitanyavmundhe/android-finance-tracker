@@ -16,8 +16,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.common.api.ApiException
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Check
@@ -90,7 +95,30 @@ fun DashboardScreen(
     val transactions by viewModel.transactions.collectAsState()
     val updateStatus by viewModel.updateStatus.collectAsState()
     val syncStatus by viewModel.syncStatus.collectAsState()
+    val currentUser by viewModel.currentUser.collectAsState()
+    val isGoogleUser = currentUser != null && !currentUser!!.isAnonymous
     var showProfileDialog by remember { mutableStateOf(false) }
+
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            val account = task.getResult(ApiException::class.java)
+            val idToken = account?.idToken
+            if (idToken != null) {
+                viewModel.handleGoogleSignInResult(idToken) { success ->
+                    if (success) {
+                        Toast.makeText(context, "Signed in as ${account.email}", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "Google Sign-In failed", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Toast.makeText(context, "Sign-in error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     // In-App Update Dialog
     UpdateDialog(
@@ -112,27 +140,31 @@ fun DashboardScreen(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(38.dp)
                             .clip(CircleShape)
-                            .background(StitchPrimaryContainer),
+                            .background(if (isGoogleUser) StitchIncomeContainer else StitchPrimaryContainer),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
+                        Text(
+                            text = if (isGoogleUser) {
+                                (currentUser?.displayName ?: currentUser?.email ?: "U").take(1).uppercase()
+                            } else {
+                                "G"
+                            },
+                            fontWeight = FontWeight.Bold,
+                            color = if (isGoogleUser) StitchIncome else Color.White,
+                            fontSize = 16.sp
                         )
                     }
                     Column {
                         Text(
-                            text = "Finance Tracker",
-                            fontSize = 18.sp,
+                            text = if (isGoogleUser) (currentUser?.displayName ?: "Google User") else "Finance Tracker",
+                            fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                             color = StitchOnSurface
                         )
                         Text(
-                            text = "Version v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})",
+                            text = if (isGoogleUser) (currentUser?.email ?: "") else "Version v${BuildConfig.VERSION_NAME}",
                             fontSize = 12.sp,
                             color = StitchOnSurfaceVariant
                         )
@@ -144,6 +176,86 @@ fun DashboardScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    // Google Account Card
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = StitchContainerLow),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            if (isGoogleUser) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = "Google Account",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = StitchOnSurface
+                                        )
+                                        Text(
+                                            text = "Connected & Backed Up",
+                                            fontSize = 12.sp,
+                                            color = StitchIncome
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                androidx.compose.material3.OutlinedButton(
+                                    onClick = { viewModel.signOut(context) },
+                                    shape = RoundedCornerShape(50.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Sign Out", fontSize = 12.sp, color = StitchSpent)
+                                }
+                            } else {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AccountCircle,
+                                        contentDescription = null,
+                                        tint = StitchInvested,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Text(
+                                        text = "Google Sign-In",
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 14.sp,
+                                        color = StitchOnSurface
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "Sign in with Google to backup your transactions across all your devices.",
+                                    fontSize = 12.sp,
+                                    color = StitchOnSurfaceVariant,
+                                    lineHeight = 16.sp
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Button(
+                                    onClick = {
+                                        val intent = viewModel.getGoogleSignInIntent(context)
+                                        if (intent != null) {
+                                            googleSignInLauncher.launch(intent)
+                                        } else {
+                                            Toast.makeText(context, "Google Sign-In not ready", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = StitchPrimary),
+                                    shape = RoundedCornerShape(50.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Sign in with Google", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                }
+                            }
+                        }
+                    }
+
                     // Update check card
                     Card(
                         colors = CardDefaults.cardColors(containerColor = StitchContainerLow),

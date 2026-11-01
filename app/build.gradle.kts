@@ -13,8 +13,8 @@ android {
         applicationId = "com.financetracker.app"
         minSdk = 24
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.2.0"
+        versionCode = 4
+        versionName = "1.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -81,10 +81,11 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
-    // Firebase (Firestore + Auth)
+    // Firebase (Firestore + Auth) & Google Play Services
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.auth)
+    implementation(libs.play.services.auth)
 
     debugImplementation(libs.androidx.ui.tooling)
 }

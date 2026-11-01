@@ -1,9 +1,15 @@
 package com.financetracker.app.data.sync
 
+import android.content.Context
+import android.content.Intent
 import com.financetracker.app.data.TransactionRepository
 import com.financetracker.app.model.Transaction
 import com.financetracker.app.model.TransactionType
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.Dispatchers
@@ -30,13 +36,69 @@ class FirebaseSyncManager(
     private val _syncStatus = MutableStateFlow<SyncStatus>(SyncStatus.Idle)
     val syncStatus: StateFlow<SyncStatus> = _syncStatus.asStateFlow()
 
+    private val _currentUser = MutableStateFlow<FirebaseUser?>(null)
+    val currentUser: StateFlow<FirebaseUser?> = _currentUser.asStateFlow()
+
+    companion object {
+        // Web Client ID from google-services.json (client_type 3)
+        private const val WEB_CLIENT_ID = "441163620200-3b3mtt199umh1j3lv7is3lev6kv510is.apps.googleusercontent.com"
+    }
+
+    init {
+        _currentUser.value = auth.currentUser
+    }
+
+    fun getGoogleSignInIntent(context: Context): Intent {
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(WEB_CLIENT_ID)
+            .requestEmail()
+            .build()
+        val client = GoogleSignIn.getClient(context, gso)
+        return client.signInIntent
+    }
+
+    suspend fun signInWithGoogle(idToken: String): Result<FirebaseUser> = withContext(Dispatchers.IO) {
+        try {
+            val credential = GoogleAuthProvider.getCredential(idToken, null)
+            val existingUser = auth.currentUser
+            val authResult = if (existingUser != null && existingUser.isAnonymous) {
+                try {
+                    existingUser.linkWithCredential(credential).await()
+                } catch (_: Exception) {
+                    auth.signInWithCredential(credential).await()
+                }
+            } else {
+                auth.signInWithCredential(credential).await()
+            }
+
+            val user = authResult.user ?: return@withContext Result.failure(Exception("No user found after Google sign-in"))
+            _currentUser.value = user
+            syncAll()
+            Result.success(user)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    fun signOut(context: Context) {
+        try {
+            val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).build()
+            GoogleSignIn.getClient(context, gso).signOut()
+            auth.signOut()
+            _currentUser.value = null
+            _syncStatus.value = SyncStatus.Idle
+        } catch (_: Exception) {}
+    }
+
     private suspend fun ensureAuthenticated(): String? = withContext(Dispatchers.IO) {
         try {
-            val currentUser = auth.currentUser
-            if (currentUser != null) {
-                return@withContext currentUser.uid
+            val current = auth.currentUser
+            if (current != null) {
+                _currentUser.value = current
+                return@withContext current.uid
             }
             val result = auth.signInAnonymously().await()
+            _currentUser.value = result.user
             return@withContext result.user?.uid
         } catch (e: Exception) {
             null
@@ -67,7 +129,7 @@ class FirebaseSyncManager(
                 val timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis()
 
                 Transaction(
-                    id = 0, // Let Room auto-generate local id or match by timestamp+amount
+                    id = 0,
                     amount = amount,
                     type = type,
                     note = note,
@@ -134,7 +196,7 @@ class FirebaseSyncManager(
                 .set(data, SetOptions.merge())
                 .await()
         } catch (_: Exception) {
-            // Fails silently if offline; full sync will push it when internet is available
+            // Fails silently if offline; syncAll() will sync later
         }
     }
 

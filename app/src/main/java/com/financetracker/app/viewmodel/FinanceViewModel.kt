@@ -20,6 +20,7 @@ import java.util.Calendar
 
 import com.financetracker.app.data.sync.FirebaseSyncManager
 import com.financetracker.app.data.sync.SyncStatus
+import com.google.firebase.auth.FirebaseUser
 
 data class FinanceSummary(
     val totalIncome: Double = 0.0,
@@ -52,9 +53,27 @@ class FinanceViewModel(
     val syncStatus: StateFlow<SyncStatus> = syncManager?.syncStatus
         ?: MutableStateFlow(SyncStatus.Idle).asStateFlow()
 
+    val currentUser: StateFlow<FirebaseUser?> = syncManager?.currentUser
+        ?: MutableStateFlow(null).asStateFlow()
+
     init {
         checkForUpdates(silent = true)
         triggerSync()
+    }
+
+    fun getGoogleSignInIntent(context: android.content.Context): android.content.Intent? {
+        return syncManager?.getGoogleSignInIntent(context)
+    }
+
+    fun handleGoogleSignInResult(idToken: String, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val result = syncManager?.signInWithGoogle(idToken)
+            onComplete(result?.isSuccess == true)
+        }
+    }
+
+    fun signOut(context: android.content.Context) {
+        syncManager?.signOut(context)
     }
 
     fun checkForUpdates(silent: Boolean = false) {
