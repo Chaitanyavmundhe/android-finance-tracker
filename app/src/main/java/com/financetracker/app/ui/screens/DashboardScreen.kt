@@ -71,6 +71,7 @@ import com.financetracker.app.ui.theme.StitchPrimary
 import com.financetracker.app.ui.theme.StitchPrimaryContainer
 import com.financetracker.app.ui.theme.StitchSpent
 import com.financetracker.app.ui.theme.StitchSpentContainer
+import com.financetracker.app.data.sync.SyncStatus
 import com.financetracker.app.updater.UpdateStatus
 import com.financetracker.app.viewmodel.BottomNavTab
 import com.financetracker.app.viewmodel.FinanceViewModel
@@ -88,6 +89,7 @@ fun DashboardScreen(
     val summary by viewModel.summary.collectAsState()
     val transactions by viewModel.transactions.collectAsState()
     val updateStatus by viewModel.updateStatus.collectAsState()
+    val syncStatus by viewModel.syncStatus.collectAsState()
     var showProfileDialog by remember { mutableStateOf(false) }
 
     // In-App Update Dialog
@@ -194,7 +196,7 @@ fun DashboardScreen(
                         }
                     }
 
-                    // Cloud Sync Card (Approach 4 setup)
+                    // Cloud Sync Card (Firebase Firestore)
                     Card(
                         colors = CardDefaults.cardColors(containerColor = StitchContainerLow),
                         shape = RoundedCornerShape(16.dp),
@@ -202,29 +204,80 @@ fun DashboardScreen(
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
                             Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.CloudSync,
-                                    contentDescription = null,
-                                    tint = StitchIncome,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Text(
-                                    text = "Cloud Sync (Firebase)",
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 14.sp,
-                                    color = StitchOnSurface
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CloudSync,
+                                        contentDescription = null,
+                                        tint = StitchIncome,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Text(
+                                        text = "Cloud Sync (Firebase)",
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 14.sp,
+                                        color = StitchOnSurface
+                                    )
+                                }
+
+                                when (syncStatus) {
+                                    is SyncStatus.Syncing -> {
+                                        androidx.compose.material3.CircularProgressIndicator(
+                                            modifier = Modifier.size(16.dp),
+                                            strokeWidth = 2.dp,
+                                            color = StitchIncome
+                                        )
+                                    }
+                                    is SyncStatus.Synced -> {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(50.dp))
+                                                .background(StitchIncomeContainer)
+                                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                                        ) {
+                                            Text("Active", fontSize = 11.sp, color = StitchIncome, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    is SyncStatus.Error -> {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(50.dp))
+                                                .background(StitchSpentContainer)
+                                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                                        ) {
+                                            Text("Offline", fontSize = 11.sp, color = StitchSpent, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    SyncStatus.Idle -> {}
+                                }
                             }
                             Spacer(modifier = Modifier.height(6.dp))
+                            val statusDescription = when (val s = syncStatus) {
+                                is SyncStatus.Syncing -> "Syncing transactions with Firestore..."
+                                is SyncStatus.Synced -> "Synced (${s.count} transactions backed up)"
+                                is SyncStatus.Error -> "Offline / Local mode (${s.message})"
+                                SyncStatus.Idle -> "Transactions backed up to Google Cloud automatically."
+                            }
                             Text(
-                                text = "Keeps your transactions permanently backed up on Google Cloud across all devices and updates.",
+                                text = statusDescription,
                                 fontSize = 12.sp,
                                 color = StitchOnSurfaceVariant,
                                 lineHeight = 16.sp
                             )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            androidx.compose.material3.OutlinedButton(
+                                onClick = { viewModel.triggerSync() },
+                                shape = RoundedCornerShape(50.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Sync Now", fontSize = 13.sp, color = StitchOnSurface)
+                            }
                         }
                     }
                 }

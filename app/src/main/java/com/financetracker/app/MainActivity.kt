@@ -24,7 +24,7 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: FinanceViewModel by viewModels {
         val app = application as FinanceApp
-        FinanceViewModelFactory(app.repository)
+        FinanceViewModelFactory(app.repository, app.syncManager)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

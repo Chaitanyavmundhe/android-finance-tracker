@@ -18,6 +18,9 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
+import com.financetracker.app.data.sync.FirebaseSyncManager
+import com.financetracker.app.data.sync.SyncStatus
+
 data class FinanceSummary(
     val totalIncome: Double = 0.0,
     val totalInvestment: Double = 0.0,
@@ -32,7 +35,10 @@ enum class BottomNavTab {
     ANALYTICS
 }
 
-class FinanceViewModel(private val repository: TransactionRepository) : ViewModel() {
+class FinanceViewModel(
+    private val repository: TransactionRepository,
+    private val syncManager: FirebaseSyncManager? = null
+) : ViewModel() {
 
     private val _selectedFilter = MutableStateFlow(TimeFilter.MONTH)
     val selectedFilter: StateFlow<TimeFilter> = _selectedFilter.asStateFlow()
@@ -43,8 +49,12 @@ class FinanceViewModel(private val repository: TransactionRepository) : ViewMode
     private val _updateStatus = MutableStateFlow<com.financetracker.app.updater.UpdateStatus>(com.financetracker.app.updater.UpdateStatus.Idle)
     val updateStatus: StateFlow<com.financetracker.app.updater.UpdateStatus> = _updateStatus.asStateFlow()
 
+    val syncStatus: StateFlow<SyncStatus> = syncManager?.syncStatus
+        ?: MutableStateFlow(SyncStatus.Idle).asStateFlow()
+
     init {
         checkForUpdates(silent = true)
+        triggerSync()
     }
 
     fun checkForUpdates(silent: Boolean = false) {
@@ -144,20 +154,27 @@ class FinanceViewModel(private val repository: TransactionRepository) : ViewMode
     fun addTransaction(amount: Double, type: TransactionType, note: String) {
         if (amount <= 0) return
         viewModelScope.launch {
-            repository.insertTransaction(
-                Transaction(
-                    amount = amount,
-                    type = type,
-                    note = note.trim(),
-                    timestamp = System.currentTimeMillis()
-                )
+            val transaction = Transaction(
+                amount = amount,
+                type = type,
+                note = note.trim(),
+                timestamp = System.currentTimeMillis()
             )
+            val generatedId = repository.insertTransaction(transaction)
+            syncManager?.uploadTransaction(transaction.copy(id = generatedId))
         }
     }
 
     fun deleteTransaction(transaction: Transaction) {
         viewModelScope.launch {
             repository.deleteTransaction(transaction)
+            syncManager?.deleteTransactionFromCloud(transaction)
+        }
+    }
+
+    fun triggerSync() {
+        viewModelScope.launch {
+            syncManager?.syncAll()
         }
     }
 
@@ -185,12 +202,14 @@ class FinanceViewModel(private val repository: TransactionRepository) : ViewMode
     }
 }
 
-class FinanceViewModelFactory(private val repository: TransactionRepository) :
-    ViewModelProvider.Factory {
+class FinanceViewModelFactory(
+    private val repository: TransactionRepository,
+    private val syncManager: FirebaseSyncManager? = null
+) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(FinanceViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return FinanceViewModel(repository) as T
+            return FinanceViewModel(repository, syncManager) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

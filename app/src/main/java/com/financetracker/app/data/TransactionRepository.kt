@@ -9,8 +9,8 @@ class TransactionRepository(private val dao: TransactionDao) {
     fun getTransactionsSince(startTime: Long): Flow<List<Transaction>> =
         dao.getTransactionsSince(startTime)
 
-    suspend fun insertTransaction(transaction: Transaction) {
-        dao.insertTransaction(transaction)
+    suspend fun insertTransaction(transaction: Transaction): Long {
+        return dao.insertTransaction(transaction)
     }
 
     suspend fun deleteTransaction(transaction: Transaction) {
