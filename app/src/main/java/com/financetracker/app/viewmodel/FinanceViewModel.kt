@@ -40,6 +40,54 @@ class FinanceViewModel(private val repository: TransactionRepository) : ViewMode
     private val _currentTab = MutableStateFlow(BottomNavTab.DASHBOARD)
     val currentTab: StateFlow<BottomNavTab> = _currentTab.asStateFlow()
 
+    private val _updateStatus = MutableStateFlow<com.financetracker.app.updater.UpdateStatus>(com.financetracker.app.updater.UpdateStatus.Idle)
+    val updateStatus: StateFlow<com.financetracker.app.updater.UpdateStatus> = _updateStatus.asStateFlow()
+
+    init {
+        checkForUpdates(silent = true)
+    }
+
+    fun checkForUpdates(silent: Boolean = false) {
+        viewModelScope.launch {
+            if (!silent) _updateStatus.value = com.financetracker.app.updater.UpdateStatus.Checking
+            val result = com.financetracker.app.updater.AppUpdater.checkForUpdates()
+            result.onSuccess { info ->
+                if (info.isUpdateAvailable) {
+                    _updateStatus.value = com.financetracker.app.updater.UpdateStatus.UpdateAvailable(info)
+                } else {
+                    if (!silent) _updateStatus.value = com.financetracker.app.updater.UpdateStatus.UpToDate
+                }
+            }.onFailure { error ->
+                if (!silent) {
+                    _updateStatus.value = com.financetracker.app.updater.UpdateStatus.Error(
+                        error.localizedMessage ?: "Failed to check for updates"
+                    )
+                }
+            }
+        }
+    }
+
+    fun downloadAndInstallUpdate(context: android.content.Context, info: com.financetracker.app.updater.UpdateInfo) {
+        viewModelScope.launch {
+            _updateStatus.value = com.financetracker.app.updater.UpdateStatus.Downloading(0f)
+            val result = com.financetracker.app.updater.AppUpdater.downloadApk(context, info.downloadUrl) { progress ->
+                _updateStatus.value = com.financetracker.app.updater.UpdateStatus.Downloading(progress)
+            }
+            result.onSuccess { apkFile ->
+                _updateStatus.value = com.financetracker.app.updater.UpdateStatus.ReadyToInstall(apkFile)
+                com.financetracker.app.updater.AppUpdater.installApk(context, apkFile)
+            }.onFailure { error ->
+                _updateStatus.value = com.financetracker.app.updater.UpdateStatus.Error(
+                    error.localizedMessage ?: "Download failed"
+                )
+            }
+        }
+    }
+
+    fun dismissUpdateDialog() {
+        _updateStatus.value = com.financetracker.app.updater.UpdateStatus.Idle
+    }
+
     val allTransactions: StateFlow<List<Transaction>> = repository.allTransactions
         .stateIn(
             scope = viewModelScope,
