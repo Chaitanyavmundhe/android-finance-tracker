@@ -57,7 +57,8 @@ import java.util.Locale
 @Composable
 fun SummaryCard(
     summary: FinanceSummary,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isCloudSynced: Boolean = false
 ) {
     val total = summary.totalInvestment + summary.totalExpense + summary.totalIncome
     val investPercent = if (total > 0) ((summary.totalInvestment / total) * 100).toInt() else 0
@@ -131,11 +132,14 @@ fun SummaryCard(
                         modifier = Modifier
                             .size(7.dp)
                             .clip(CircleShape)
-                            .background(StitchInvested.copy(alpha = pulseAlpha))
+                            .background(
+                                if (isCloudSynced) StitchInvested.copy(alpha = pulseAlpha)
+                                else StitchOnSurfaceVariant.copy(alpha = 0.5f)
+                            )
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Live Sync",
+                        text = if (isCloudSynced) "Cloud Synced" else "Local Storage",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium,
                         color = StitchOnSurfaceVariant

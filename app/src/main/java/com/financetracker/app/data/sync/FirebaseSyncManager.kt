@@ -45,7 +45,16 @@ class FirebaseSyncManager(
     }
 
     init {
-        _currentUser.value = auth.currentUser
+        val current = auth.currentUser
+        if (current != null && current.isAnonymous) {
+            // Clean up any legacy anonymous sign-in session
+            try {
+                auth.signOut()
+            } catch (_: Exception) {}
+            _currentUser.value = null
+        } else {
+            _currentUser.value = current
+        }
     }
 
     fun getGoogleSignInIntent(context: Context): Intent {
@@ -60,17 +69,7 @@ class FirebaseSyncManager(
     suspend fun signInWithGoogle(idToken: String): Result<FirebaseUser> = withContext(Dispatchers.IO) {
         try {
             val credential = GoogleAuthProvider.getCredential(idToken, null)
-            val existingUser = auth.currentUser
-            val authResult = if (existingUser != null && existingUser.isAnonymous) {
-                try {
-                    existingUser.linkWithCredential(credential).await()
-                } catch (_: Exception) {
-                    auth.signInWithCredential(credential).await()
-                }
-            } else {
-                auth.signInWithCredential(credential).await()
-            }
-
+            val authResult = auth.signInWithCredential(credential).await()
             val user = authResult.user ?: return@withContext Result.failure(Exception("No user found after Google sign-in"))
             _currentUser.value = user
             syncAll()
@@ -91,26 +90,24 @@ class FirebaseSyncManager(
     }
 
     private suspend fun ensureAuthenticated(): String? = withContext(Dispatchers.IO) {
-        try {
-            val current = auth.currentUser
-            if (current != null) {
-                _currentUser.value = current
-                return@withContext current.uid
-            }
-            val result = auth.signInAnonymously().await()
-            _currentUser.value = result.user
-            return@withContext result.user?.uid
-        } catch (e: Exception) {
-            null
+        val current = auth.currentUser
+        if (current != null && !current.isAnonymous) {
+            _currentUser.value = current
+            return@withContext current.uid
         }
+        // No anonymous auth; cloud sync requires active Google sign-in
+        _currentUser.value = null
+        return@withContext null
     }
 
     suspend fun syncAll(): Result<Int> = withContext(Dispatchers.IO) {
+        val userId = ensureAuthenticated()
+        if (userId == null) {
+            _syncStatus.value = SyncStatus.Idle
+            return@withContext Result.failure(Exception("Google Sign-In required for cloud sync"))
+        }
         _syncStatus.value = SyncStatus.Syncing
         try {
-            val userId = ensureAuthenticated()
-                ?: return@withContext Result.failure(Exception("Could not authenticate with cloud"))
-
             val userTransactionsRef = firestore.collection("users")
                 .document(userId)
                 .collection("transactions")
