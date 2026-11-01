@@ -50,9 +50,6 @@ fun BudgetsScreen(
     modifier: Modifier = Modifier
 ) {
     val summary by viewModel.summary.collectAsState()
-    val monthlyBudget = 50000.0 // Default suggested baseline budget limit
-    val spentRatio = (summary.totalExpense / monthlyBudget).toFloat().coerceIn(0f, 1f)
-    val remaining = (monthlyBudget - summary.totalExpense).coerceAtLeast(0.0)
 
     Column(
         modifier = modifier
@@ -70,94 +67,24 @@ fun BudgetsScreen(
         ) {
             Column {
                 Text(
-                    text = "Budgets & Limits",
+                    text = "Budgets & Rules",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = StitchOnSurface
                 )
                 Text(
-                    text = "Monthly expenditure caps & targets",
+                    text = "Financial health guidance & principles",
                     fontSize = 12.sp,
                     color = StitchOnSurfaceVariant
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-        // Main Budget Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = StitchCardLowest),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-        ) {
-            Column(modifier = Modifier.padding(18.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Monthly Spending Cap",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = StitchOnSurface
-                    )
-                    Text(
-                        text = "${(spentRatio * 100).toInt()}% used",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (spentRatio > 0.8f) StitchSpent else StitchInvested
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Progress Bar
-                LinearProgressIndicator(
-                    progress = spentRatio,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(10.dp)
-                        .clip(CircleShape),
-                    color = if (spentRatio > 0.85f) StitchSpent else StitchInvested,
-                    trackColor = StitchContainerLow
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text(text = "Spent this month", fontSize = 11.sp, color = StitchOnSurfaceVariant)
-                        Text(
-                            text = "₹" + String.format(Locale.US, "%,.0f", summary.totalExpense),
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = StitchSpent
-                        )
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(text = "Remaining allowance", fontSize = 11.sp, color = StitchOnSurfaceVariant)
-                        Text(
-                            text = "₹" + String.format(Locale.US, "%,.0f", remaining),
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = StitchInvested
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Budget Advice & Insights
+        // Financial Health & Budget Strategy
         Text(
-            text = "Healthy Spending Tips",
+            text = "Healthy Financial Rules",
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             color = StitchOnSurface

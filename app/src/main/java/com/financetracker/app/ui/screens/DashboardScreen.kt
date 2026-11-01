@@ -95,7 +95,6 @@ fun DashboardScreen(
     val context = LocalContext.current
     val selectedFilter by viewModel.selectedFilter.collectAsState()
     val summary by viewModel.summary.collectAsState()
-    val transactions by viewModel.transactions.collectAsState()
     val updateStatus by viewModel.updateStatus.collectAsState()
     val syncStatus by viewModel.syncStatus.collectAsState()
     val currentUser by viewModel.currentUser.collectAsState()
@@ -503,68 +502,6 @@ fun DashboardScreen(
         )
 
         Spacer(modifier = Modifier.height(16.dp))
-
-        // Recent Activity Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Recent Activity",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = StitchOnSurface
-            )
-            TextButton(onClick = { viewModel.setTab(BottomNavTab.LEDGER) }) {
-                Text(
-                    text = "View All",
-                    fontSize = 13.sp,
-                    color = StitchInvested,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-
-        if (transactions.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "No records for ${selectedFilter.label.lowercase()}",
-                        fontSize = 14.sp,
-                        color = StitchOnSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Tap '+' to add a transaction",
-                        fontSize = 12.sp,
-                        color = StitchOnSurfaceVariant.copy(alpha = 0.7f)
-                    )
-                }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(transactions.take(8), key = { it.id }) { item ->
-                    TransactionItemView(
-                        transaction = item,
-                        onDelete = { viewModel.deleteTransaction(item) }
-                    )
-                }
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-            }
-        }
     }
 }
 
